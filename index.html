@@ -301,6 +301,8 @@ th{font-weight:600;border-top:0;font-size:12px;text-transform:uppercase;letter-s
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 @media print{.top,.side,.tabs,.complete,.pager,.toc{display:none!important}.shell{display:block}.doc{border:0}}
+
+.kb-tree summary{padding:14px 10px;cursor:pointer;font-weight:600;font-size:14px}.kb-find label{display:block;font-weight:600;margin-bottom:12px}.kb-find input{flex:1;min-width:0;border:1px solid #bbb;border-radius:12px;padding:14px;font:inherit}.kb-find .row-gap{display:flex;flex-wrap:wrap}.kb-section{display:block;color:inherit;text-decoration:none}.kb-section h2{margin:16px 0 12px}.kb-section p{margin-bottom:18px}.kb-tree .nav{white-space:normal}.doc{overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -430,8 +432,9 @@ let route = {}, test = {draft: Array(TOTAL_Q).fill(null), cur: 0, done: null}, l
 function parse() {
   const h = location.hash.replace(/^#\/?/, '');
   const [p, a] = h.split('/');
-  if (p === 'lesson' && M.some(m => m.id === a)) return {v: 'lesson', id: a};
-  if (['course', 'test', 'library', 'favorites', 'progress', 'search'].includes(p)) return {v: p, q: p === 'search' ? decodeURIComponent(a || '') : ''};
+  if (['lesson','article'].includes(p) && M.some(m => m.id === a)) return {v: p, id: a};
+  if (p === 'section' && a === 'partner') return {v: 'section'};
+  if (['learning', 'course', 'test', 'library', 'favorites', 'progress', 'search'].includes(p)) return {v: p, q: p === 'search' ? decodeURIComponent(a || '') : ''};
   return {v: 'home'};
 }
 function go(h) { if (location.hash === h) render(); else location.hash = h; }
@@ -440,26 +443,22 @@ window.addEventListener('hashchange', () => { route = parse(); render(true); });
 /* ---------- каркас ---------- */
 function ring(p) { const r = 14, c = 2 * Math.PI * r; return `<svg class="ring" viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="${r}" fill="none" stroke="#D2F1FF" stroke-width="5"/><circle cx="17" cy="17" r="${r}" fill="none" stroke="#000" stroke-width="5" stroke-linecap="round" stroke-dasharray="${c * p / 100} ${c}" transform="rotate(-90 17 17)"/></svg>`; }
 function sidebar() {
-  const v = route.v, cur = (x, id) => (v === x && (!id || route.id === id)) ? ' aria-current="page"' : '';
-  const fav = M.filter(m => state[m.id].fav).length;
-  const open = localStorage.getItem('dt-tree') !== '0';
-  return `<div class="grp">Обучение</div>
-  <a class="nav" href="#/"${cur('home')}>${ic('home')}Моё обучение</a>
-  <div class="tw"><a class="nav" href="#/course"${cur('course')}>${ic('course')}${esc(COURSE.title)}</a><button class="caret" aria-expanded="${open}" aria-controls="tree" aria-label="Свернуть или развернуть уроки" onclick="toggleTree(this)">${ic('down')}</button></div>
-  <div class="tree" id="tree"${open ? '' : ' hidden'}>
-    ${M.map((m, i) => `<a class="nav" href="#/lesson/${m.id}"${cur('lesson', m.id)}><span class="st ${stat(m.id)}">${state[m.id].done ? ic('check') : ''}</span>${i + 1}. ${esc(m.title)}</a>`).join('')}
-    <a class="nav" href="#/test"${cur('test')}>${ic('test')}Итоговое тестирование</a>
-  </div>
-  <div class="grp">Справочник</div>
-  <a class="nav" href="#/library"${cur('library')}>${ic('lib')}Все материалы<span class="cnt">${M.length}</span></a>
-  <a class="nav" href="#/favorites"${cur('favorites')}>${ic('star')}Избранное<span class="cnt">${fav || ''}</span></a>
-  <div class="grp">Профиль</div>
-  <a class="nav" href="#/progress"${cur('progress')}>${ic('pie')}Мой прогресс</a>`;
+ const cur = v => route.v === v ? ' aria-current="page"' : '';
+ return `<div class="grp">База знаний</div>
+ <a class="nav" href="#/"${cur('home')}>${ic('home')}Главная</a>
+ <details class="kb-tree" open><summary>Работа с партнёром</summary><div class="tree">
+ <a class="nav" href="#/section/partner"${cur('section')}>${ic('lib')}Все материалы раздела</a>
+ ${M.map(m => `<a class="nav" href="#/article/${m.id}"${route.v === 'article' && route.id === m.id ? ' aria-current="page"' : ''}>${ic('doc')}${esc(m.title)}</a>`).join('')}</div></details>
+ <a class="nav" href="#/library"${cur('library')}>${ic('lib')}Все материалы<span class="cnt">${M.length}</span></a>
+ <a class="nav" href="#/favorites"${cur('favorites')}>${ic('star')}Избранное</a>
+ <div class="grp">Обучение</div><a class="nav" href="#/learning"${cur('learning')}>${ic('course')}Моё обучение</a>
+ <a class="nav" href="#/course"${cur('course')}>${ic('course')}${esc(COURSE.title)}</a>
+ <a class="nav" href="#/test"${cur('test')}>${ic('test')}Итоговое тестирование</a>
+ <a class="nav" href="#/progress"${cur('progress')}>${ic('pie')}Мой прогресс</a>`;
 }
 function tabs() {
-  const v = route.v, c = x => x.includes(v) ? ' aria-current="page"' : '';
-  return [['#/', 'home', 'Обучение', ['home']], ['#/course', 'course', 'Курс', ['course', 'lesson', 'test']], ['#/library', 'lib', 'Справочник', ['library', 'search']], ['#/favorites', 'star', 'Избранное', ['favorites']], ['#/progress', 'pie', 'Прогресс', ['progress']]]
-    .map(([h, i, t, vs]) => `<a href="${h}"${c(vs)}>${ic(i)}${t}</a>`).join('');
+ return [['#/', 'home', 'База', ['home']], ['#/section/partner', 'lib', 'Раздел', ['section','article']], ['#/library', 'search', 'Материалы', ['library','search']], ['#/learning', 'course', 'Обучение', ['learning','course','lesson','test']], ['#/favorites', 'star', 'Избранное', ['favorites','progress']]]
+ .map(([h,i,t,vs]) => `<a href="${h}"${vs.includes(route.v) ? ' aria-current="page"' : ''}>${ic(i)}${t}</a>`).join('');
 }
 window.toggleTree = b => { const o = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', o); $('#tree').hidden = !o; try { localStorage.setItem('dt-tree', o ? '1' : '0'); } catch (e) {} };
 function drawer(o) { $('#side').classList.toggle('open', o); $('#scrim').hidden = !o; $('#menuBtn').setAttribute('aria-expanded', o); }
@@ -472,21 +471,23 @@ function render(nav) {
   $('#side').innerHTML = sidebar();
   $('#tabs').innerHTML = tabs();
   if (route.v !== 'search' && document.activeElement !== $('#q')) { $('#q').value = ''; query = ''; }
-  const v = {home, course, lesson, test: testView, library: () => library(false), favorites: () => library(true), progress, search}[route.v];
+  const v = {home, learning, section: partnerSection, article, course, lesson, test: testView, library: () => library(false), favorites: () => library(true), progress, search}[route.v];
   $('#view').innerHTML = v() + (warn ? `<p class="err" role="alert">${esc(warn)}</p>` : '');
   after[route.v] && after[route.v]();
   drawer(false);
-  document.title = ({home: 'Моё обучение', course: COURSE.title, lesson: (M.find(m => m.id === route.id) || {}).title, test: 'Итоговое тестирование', library: 'Все материалы', favorites: 'Избранное', progress: 'Мой прогресс', search: 'Поиск'}[route.v] || '') + ' — База знаний';
+  document.title = ({home: 'База знаний', learning: 'Моё обучение', section: 'Работа с партнёром', article: (M.find(m => m.id === route.id) || {}).title, course: COURSE.title, lesson: (M.find(m => m.id === route.id) || {}).title, test: 'Итоговое тестирование', library: 'Все материалы', favorites: 'Избранное', progress: 'Мой прогресс', search: 'Поиск'}[route.v] || '') + ' — База знаний';
   if (nav) { window.scrollTo(0, 0); const h = $('#view h1'); if (h) { h.setAttribute('tabindex', '-1'); h.focus({preventScroll: true}); } }
 }
 const after = {};
 
 /* ---------- экраны ---------- */
 function lessonRow(m, i, opts = {}) {
-  const qr = lms.quiz[m.id];
-  return `<div class="item link" onclick="go('#/lesson/${m.id}')">
+  const training = ['learning','course','lesson'].includes(route.v);
+  const target = '#/' + (training ? 'lesson/' : 'article/') + m.id;
+  const qr = training ? lms.quiz[m.id] : null;
+  return `<div class="item link" onclick="go('${target}')">
     ${opts.num ? `<span class="num ${state[m.id].done ? 'done' : ''}">${state[m.id].done ? ic('check') : i + 1}</span>` : thumb(i)}
-    <div class="body"><a class="t" href="#/lesson/${m.id}" onclick="event.stopPropagation()" style="text-decoration:none">${opts.num ? '' : `Урок ${i + 1}. `}${esc(m.title)}</a>
+    <div class="body"><a class="t" href="${target}" onclick="event.stopPropagation()" style="text-decoration:none">${training && !opts.num ? `Урок ${i + 1}. ` : ''}${esc(m.title)}</a>
       <p class="d">${opts.snip || esc(m.summary)}</p>
       <div class="meta"><span>${ic('clock')}≈ ${mins(m)} мин</span><span>${ic('doc')}${esc(m.source)}</span>${qr ? `<span>${ic('test')}Самопроверка ${qr.score}/${qr.total}</span>` : ''}</div></div>
     <div class="end"><span class="status ${stat(m.id)}">${statTxt(m.id)}</span>
@@ -503,7 +504,7 @@ function ctaText() {
   if (!lms.attempts.length) return ['Пройти итоговый тест', '#/test'];
   return ['Повторить курс', '#/course'];
 }
-function home() {
+function learning() {
   const n = doneN(), [cta, href] = ctaText(), b = bestTest(), qd = M.filter(m => lms.quiz[m.id]).length;
   const favs = M.filter(m => state[m.id].fav);
   return `<div class="page">
@@ -528,7 +529,7 @@ function home() {
 function course() {
   const n = doneN(), [cta, href] = ctaText();
   return `<div class="page">
-  <nav class="crumbs" aria-label="Навигация"><a href="#/">Моё обучение</a>${ic('right')}<span>${esc(COURSE.title)}</span></nav>
+  <nav class="crumbs" aria-label="Навигация"><a href="#/learning">Моё обучение</a>${ic('right')}<span>${esc(COURSE.title)}</span></nav>
   <section class="course-head"><div class="txt"><span class="tag">Курс</span><h1 style="font-size:clamp(28px,3.4vw,44px);letter-spacing:-.05em">${esc(COURSE.title)}</h1><p class="lead" style="margin:0">${esc(COURSE.summary)}</p>
     <div class="meta" style="font-weight:600"><span>${ic('course')}${M.length} урока</span><span>${ic('test')}${TOTAL_Q} вопросов в тесте</span><span>${ic('clock')}≈ ${totalMin()} мин</span></div>
     <div><div class="bar" style="background:#fff" role="progressbar" aria-valuenow="${pct(n, M.length)}" aria-valuemin="0" aria-valuemax="100" aria-label="Прогресс курса"><span style="width:${pct(n, M.length)}%"></span></div><p style="margin-top:8px;font-weight:600;font-size:14px">Изучено ${n} из ${M.length} · ${pct(n, M.length)}%</p></div>
@@ -551,7 +552,7 @@ function lesson() {
   const prev = M[i - 1], next = M[i + 1];
   const tocAll = [{id: 'top', t: 'Начало урока'}, ...toc, {id: 'lim', t: 'Ограничения и пояснения'}, {id: 'quiz', t: 'Самопроверка'}, {id: 'fin', t: 'Завершение урока'}];
   return `<div class="page">
-  <nav class="crumbs" aria-label="Навигация"><a href="#/">Моё обучение</a>${ic('right')}<a href="#/course">${esc(COURSE.title)}</a>${ic('right')}<span>Урок ${i + 1}</span></nav>
+  <nav class="crumbs" aria-label="Навигация"><a href="#/learning">Моё обучение</a>${ic('right')}<a href="#/course">${esc(COURSE.title)}</a>${ic('right')}<span>Урок ${i + 1}</span></nav>
   <div class="lesson"><div>
     <div class="lesson-top"><strong style="font-size:14px">Урок ${i + 1} из ${M.length}</strong><div class="bar" role="progressbar" aria-valuenow="${pct(n, M.length)}" aria-valuemin="0" aria-valuemax="100" aria-label="Прогресс курса"><span style="width:${pct(n, M.length)}%"></span></div><span style="font-size:14px;font-weight:600">${pct(n, M.length)}%</span></div>
     <article class="doc"><div id="top" class="row-gap"><span class="tag">Урок ${i + 1}</span><span class="status ${stat(m.id)}">${statTxt(m.id)}</span></div>
@@ -605,7 +606,7 @@ function testView() {
   if (test.done) return result();
   const k = test.cur, q = Q[k], answered = test.draft.filter(x => x !== null).length, last = lastTest();
   return `<div class="page test-wrap">
-  <nav class="crumbs" aria-label="Навигация"><a href="#/">Моё обучение</a>${ic('right')}<a href="#/course">${esc(COURSE.title)}</a>${ic('right')}<span>Итоговое тестирование</span></nav>
+  <nav class="crumbs" aria-label="Навигация"><a href="#/learning">Моё обучение</a>${ic('right')}<a href="#/course">${esc(COURSE.title)}</a>${ic('right')}<span>Итоговое тестирование</span></nav>
   <div class="head"><div><h1>Итоговое тестирование</h1><p class="lead">${TOTAL_Q} вопросов, один ответ в каждом. Без таймера, порога и лимита попыток. Результат не меняет отметки «Изучено». ${last ? 'Последняя попытка: ' + last.score + ' из ' + last.total + ', ' + fmtDate(last.date) + '.' : ''}</p></div></div>
   <div class="card qcard">
     <div class="row-gap" style="justify-content:space-between"><span class="tag">Вопрос ${k + 1} из ${TOTAL_Q}</span><span style="font-size:14px;font-weight:600" id="answered" aria-live="polite">Отвечено ${answered} из ${TOTAL_Q}</span></div>
@@ -637,7 +638,7 @@ window.tRetry = () => { test = {draft: Array(TOTAL_Q).fill(null), cur: 0, done: 
 function result() {
   const r = test.done, a = r.answers;
   return `<div class="page test-wrap">
-  <nav class="crumbs" aria-label="Навигация"><a href="#/">Моё обучение</a>${ic('right')}<a href="#/course">${esc(COURSE.title)}</a>${ic('right')}<span>Результат</span></nav>
+  <nav class="crumbs" aria-label="Навигация"><a href="#/learning">Моё обучение</a>${ic('right')}<a href="#/course">${esc(COURSE.title)}</a>${ic('right')}<span>Результат</span></nav>
   <section class="course-head" style="grid-template-columns:minmax(0,1fr) 220px"><div class="txt"><span class="tag">Результат попытки</span>
     <div class="score"><div class="big">${r.score}/${r.total}</div><div><h1 style="font-size:28px">${pct(r.score, r.total)}% верных ответов</h1><p style="margin-top:8px;font-size:15px;line-height:1.4">Самопроверка, не аттестация. Порог не задан. Отметки изучения не изменены.</p></div></div>
     <div class="row-gap"><button class="btn pri" onclick="tRetry()">Новая попытка</button><a class="btn" href="#/course">К программе курса</a></div></div><div class="art cover">${element(2)}</div></section>
@@ -710,6 +711,29 @@ window.importData = inp => {
   rd.readAsText(f);
 };
 window.resetData = () => { if (!confirm('Сбросить отметки, избранное, самопроверки и попытки теста?')) return; M.forEach(m => state[m.id] = {started: false, done: false, fav: false}); lms = {quiz: {}, attempts: [], last: null}; save(); try { localStorage.removeItem(TKEY); } catch (e) {} test.done = null; toast('Прогресс сброшен'); render(); };
+
+
+function home() {
+ return `<div class="page"><div class="head"><div><h1>База знаний</h1><p class="lead">Инструкции и рабочие материалы. Открывай нужный документ напрямую — проходить курс не требуется.</p></div></div>
+ <form class="kb-find card pad" onsubmit="event.preventDefault();go('#/search/'+encodeURIComponent(this.elements.term.value.trim()))"><label for="kb-term">Что нужно найти?</label><div class="row-gap"><input id="kb-term" name="term" type="search" placeholder="Например: регистрация, СОПД, индивидуальные условия" required><button class="btn pri">Найти</button></div></form>
+ <h2 style="margin:28px 0 16px">Разделы базы знаний</h2>
+ <a class="card pad kb-section" href="#/section/partner"><span class="tag blue">${M.length} материала</span><h2>Работа с партнёром</h2><p>Схема подключения, стандартные и индивидуальные условия, регистрация.</p><span>Открыть раздел →</span></a>
+ <div class="card pad" style="margin-top:20px"><h2>Нужно изучить материалы последовательно?</h2><p style="margin:12px 0">Те же документы доступны в курсе с самопроверкой и личным прогрессом.</p><a class="btn" href="#/learning">Перейти к обучению</a></div>
+ <p class="disc">Структура раздела предложена для навигации. Это не новый корпоративный регламент. В портал перенесены только три материала; остальные перечислены в справочнике как ещё не добавленные.</p></div>`;
+}
+function partnerSection() {
+ return `<div class="page"><nav class="crumbs"><a href="#/">База знаний</a>${ic('right')}<span>Работа с партнёром</span></nav><div class="head"><div><h1>Работа с партнёром</h1><p class="lead">Выбери нужную инструкцию. Порядок чтения свободный.</p></div></div><div class="list">${M.map((m,i)=>lessonRow(m,i)).join('')}</div><div class="card pad" style="margin-top:20px"><p>Для последовательного изучения этих материалов:</p><a class="btn" style="margin-top:12px" href="#/course">Курс «${esc(COURSE.title)}»</a></div></div>`;
+}
+function article() {
+ const m=M.find(x=>x.id===route.id),i=M.indexOf(m), body=markup(m);
+ return `<div class="page"><nav class="crumbs"><a href="#/">База знаний</a>${ic('right')}<a href="#/section/partner">Работа с партнёром</a>${ic('right')}<span>Материал</span></nav>
+ <article class="doc"><span class="tag blue">Рабочий материал</span><h1>${esc(m.title)}</h1><div class="meta">${ic('doc')}${esc(m.source)}</div>
+ <div class="row-gap" style="margin-top:16px"><button class="btn sm" aria-pressed="${state[m.id].fav}" onclick="fav('${m.id}')">${ic('star')}${state[m.id].fav?'В избранном':'В избранное'}</button><button class="btn sm" onclick="complete('${m.id}')">${state[m.id].done?'Снять отметку «Изучено»':'Отметить изученным'}</button></div>
+ <p class="disc">Представление по исходному документу, не новый утверждённый регламент. Актуальная редакция не подтверждена.</p>
+ ${body.html}<h2 class="sec">Ограничения и пояснения</h2><div class="callout">${inline(m.limit)}</div>
+ <div class="card pad" style="margin-top:24px"><h2>Изучить в составе курса</h2><p style="margin:12px 0">Этот же текст доступен в уроке с самопроверкой. Повторной копии документа нет.</p><a class="btn" href="#/lesson/${m.id}">Открыть урок ${i+1}</a></div></article>
+ <div style="margin-top:24px"><h2>Другие материалы раздела</h2><div class="list" style="margin-top:12px">${M.filter(x=>x.id!==m.id).map(x=>lessonRow(x,M.indexOf(x))).join('')}</div></div></div>`;
+}
 
 /* ---------- запуск ---------- */
 window.go = go;
